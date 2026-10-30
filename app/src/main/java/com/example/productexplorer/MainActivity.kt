@@ -5,10 +5,13 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Star
@@ -18,8 +21,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
@@ -33,10 +38,11 @@ class MainActivity : ComponentActivity() {
         setContent {
             ProductExplorerTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    ProductDetailScreen(
-                        product = sampleProduct(),
-                        onAddToCartClick = {
-                            // Action à ajouter plus tard
+                    // TP5 : On affiche l'écran d'accueil au démarrage
+                    ProductHomeScreen(
+                        featuredProduct = sampleProduct(),
+                        onFeaturedProductClick = {
+                            // Plus tard : ouvrir le détail du produit
                         },
                         modifier = Modifier.padding(innerPadding)
                     )
@@ -46,7 +52,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-// --- ÉTAPE 1 : Modèle de données UI ---
+// --- MODÈLE DE DONNÉES ET EXEMPLES (TP 4) ---
 data class ProductUi(
     val title: String,
     val brand: String,
@@ -60,7 +66,6 @@ data class ProductUi(
     val shippingInformation: String
 )
 
-// --- ÉTAPE 2 : Exemples de produits locaux ---
 fun sampleProduct(): ProductUi {
     return ProductUi(
         title = "Smartphone Toto X",
@@ -91,7 +96,220 @@ fun sampleProductOutOfStock(): ProductUi {
     )
 }
 
-// --- ÉTAPE 3 & 18 : Écran principal de détail produit ---
+// ==========================================
+// --- NOUVEAUX COMPOSABLES DU TP 5 (ACCUEIL) ---
+// ==========================================
+
+// 1. Écran d'accueil principal qui assemble les sections
+@Composable
+fun ProductHomeScreen(
+    featuredProduct: ProductUi,
+    onFeaturedProductClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(16.dp)
+    ) {
+        HomeHeader()
+        Spacer(modifier = Modifier.height(24.dp))
+        SearchPreviewBar()
+        Spacer(modifier = Modifier.height(24.dp))
+        FeaturedProductSection(
+            product = featuredProduct,
+            onClick = onFeaturedProductClick
+        )
+        Spacer(modifier = Modifier.height(24.dp))
+        CategoriesSection()
+        Spacer(modifier = Modifier.height(24.dp))
+        DailyOfferBox()
+    }
+}
+
+// 2. En-tête de l'accueil
+@Composable
+fun HomeHeader(modifier: Modifier = Modifier) {
+    Column(modifier = modifier) {
+        Text(
+            text = "Product Explorer",
+            style = MaterialTheme.typography.headlineMedium
+        )
+        Text(
+            text = "Découvrez les produits du moment",
+            style = MaterialTheme.typography.bodyMedium
+        )
+    }
+}
+
+// 3. Fausse barre de recherche visuelle
+@Composable
+fun SearchPreviewBar(modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.medium,
+        tonalElevation = 2.dp
+    ) {
+        Text(
+            text = "Rechercher un produit...",
+            modifier = Modifier.padding(16.dp),
+            style = MaterialTheme.typography.bodyMedium
+        )
+    }
+}
+
+// 4. Section du produit mis en avant
+@Composable
+fun FeaturedProductSection(
+    product: ProductUi,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        tonalElevation = 4.dp
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
+            Text(
+                text = "Produit mis en avant",
+                style = MaterialTheme.typography.titleMedium
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = product.title,
+                style = MaterialTheme.typography.headlineSmall
+            )
+            Text(
+                text = product.brand,
+                style = MaterialTheme.typography.bodyMedium
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            ProductQuickInfoRow(
+                price = product.price,
+                rating = product.rating,
+                stock = product.stock
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            Button(onClick = onClick) {
+                Text(text = "Voir le produit")
+            }
+        }
+    }
+}
+
+// 5. Ligne d'informations rapides (Prix, Note, Stock) avec Row
+@Composable
+fun ProductQuickInfoRow(
+    price: Double,
+    rating: Double,
+    stock: Int,
+    modifier: Modifier = Modifier
+) {
+    Row(modifier = modifier.fillMaxWidth()) {
+        Text(
+            text = "$price €",
+            modifier = Modifier.weight(1f)
+        )
+        Text(
+            text = "$rating ★",
+            modifier = Modifier.weight(1f)
+        )
+        Text(
+            text = "$stock en stock",
+            modifier = Modifier.weight(1f)
+        )
+    }
+}
+
+// 6. Section des catégories
+@Composable
+fun CategoriesSection(modifier: Modifier = Modifier) {
+    Column(modifier = modifier) {
+        Text(
+            text = "Catégories",
+            style = MaterialTheme.typography.titleMedium
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Row(modifier = Modifier.fillMaxWidth()) {
+            CategoryChip(
+                label = "Smartphones",
+                modifier = Modifier.weight(1f)
+            )
+            Spacer(modifier = Modifier.padding(4.dp))
+            CategoryChip(
+                label = "Audio",
+                modifier = Modifier.weight(1f)
+            )
+            Spacer(modifier = Modifier.padding(4.dp))
+            CategoryChip(
+                label = "Maison",
+                modifier = Modifier.weight(1f)
+            )
+        }
+    }
+}
+
+@Composable
+fun CategoryChip(label: String, modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier,
+        shape = MaterialTheme.shapes.medium,
+        tonalElevation = 2.dp
+    ) {
+        Text(
+            text = label,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            style = MaterialTheme.typography.bodyMedium
+        )
+    }
+}
+
+// 7. Bloc Offre du jour avec un badge superposé grâce à Box
+@Composable
+fun DailyOfferBox(modifier: Modifier = Modifier) {
+    Box(modifier = modifier) {
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = MaterialTheme.shapes.large,
+            tonalElevation = 2.dp
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp)
+            ) {
+                Text(
+                    text = "Offre du jour",
+                    style = MaterialTheme.typography.titleMedium
+                )
+                Text(
+                    text = "Jusqu'à -20% sur une sélection de produits",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+        }
+        Surface(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(8.dp),
+            shape = MaterialTheme.shapes.small,
+            tonalElevation = 6.dp
+        ) {
+            Text(
+                text = "Nouveau",
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                style = MaterialTheme.typography.labelMedium
+            )
+        }
+    }
+}
+
+
+// ==========================================
+// --- ANCIENS COMPOSABLES DU TP 4 (DETAIL) ---
+// ==========================================
+
 @Composable
 fun ProductDetailScreen(
     product: ProductUi,
@@ -105,11 +323,9 @@ fun ProductDetailScreen(
     ) {
         ProductImage(
             productTitle = product.title,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 16.dp)
+            modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
         )
-        ProductHeader(
+        ProductHeaderDetail(
             title = product.title,
             brand = product.brand,
             category = product.category
@@ -117,20 +333,16 @@ fun ProductDetailScreen(
         ProductPriceCard(
             price = product.price,
             discountPercentage = product.discountPercentage,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 16.dp)
+            modifier = Modifier.fillMaxWidth().padding(top = 16.dp)
         )
-        ProductRating(
+        ProductRatingDetail(
             rating = product.rating,
             modifier = Modifier.padding(top = 16.dp)
         )
         ProductAvailabilityCard(
             stock = product.stock,
             shippingInformation = product.shippingInformation,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 16.dp)
+            modifier = Modifier.fillMaxWidth().padding(top = 16.dp)
         )
         ProductDescription(
             description = product.description,
@@ -138,20 +350,14 @@ fun ProductDetailScreen(
         )
         ProductWarrantyField(
             warrantyInformation = product.warrantyInformation,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 16.dp)
+            modifier = Modifier.fillMaxWidth().padding(top = 16.dp)
         )
         AddToCartButton(
             onClick = onAddToCartClick,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 16.dp)
+            modifier = Modifier.fillMaxWidth().padding(top = 16.dp)
         )
     }
 }
-
-// --- SOUS-COMPOSANTS RÉUTILISABLES ---
 
 @Composable
 fun ProductImage(productTitle: String, modifier: Modifier = Modifier) {
@@ -163,7 +369,7 @@ fun ProductImage(productTitle: String, modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun ProductHeader(title: String, brand: String, category: String, modifier: Modifier = Modifier) {
+fun ProductHeaderDetail(title: String, brand: String, category: String, modifier: Modifier = Modifier) {
     Column(modifier = modifier) {
         Text(text = title, style = MaterialTheme.typography.headlineSmall)
         Text(text = brand, style = MaterialTheme.typography.titleMedium)
@@ -175,20 +381,14 @@ fun ProductHeader(title: String, brand: String, category: String, modifier: Modi
 fun ProductPriceCard(price: Double, discountPercentage: Double, modifier: Modifier = Modifier) {
     Card(modifier = modifier) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = "$price €",
-                style = MaterialTheme.typography.headlineSmall
-            )
-            Text(
-                text = "Remise : $discountPercentage %",
-                style = MaterialTheme.typography.bodyMedium
-            )
+            Text(text = "$price €", style = MaterialTheme.typography.headlineSmall)
+            Text(text = "Remise : $discountPercentage %", style = MaterialTheme.typography.bodyMedium)
         }
     }
 }
 
 @Composable
-fun ProductRating(rating: Double, modifier: Modifier = Modifier) {
+fun ProductRatingDetail(rating: Double, modifier: Modifier = Modifier) {
     Row(modifier = modifier) {
         Icon(
             imageVector = Icons.Default.Star,
@@ -205,18 +405,9 @@ fun ProductRating(rating: Double, modifier: Modifier = Modifier) {
 fun ProductAvailabilityCard(stock: Int, shippingInformation: String, modifier: Modifier = Modifier) {
     Card(modifier = modifier) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = "Disponibilité",
-                style = MaterialTheme.typography.titleMedium
-            )
-            Text(
-                text = "Stock : $stock unités",
-                style = MaterialTheme.typography.bodyMedium
-            )
-            Text(
-                text = shippingInformation,
-                style = MaterialTheme.typography.bodyMedium
-            )
+            Text(text = "Disponibilité", style = MaterialTheme.typography.titleMedium)
+            Text(text = "Stock : $stock unités", style = MaterialTheme.typography.bodyMedium)
+            Text(text = shippingInformation, style = MaterialTheme.typography.bodyMedium)
         }
     }
 }
@@ -224,10 +415,7 @@ fun ProductAvailabilityCard(stock: Int, shippingInformation: String, modifier: M
 @Composable
 fun ProductDescription(description: String, modifier: Modifier = Modifier) {
     Column(modifier = modifier) {
-        Text(
-            text = "Description",
-            style = MaterialTheme.typography.titleMedium
-        )
+        Text(text = "Description", style = MaterialTheme.typography.titleMedium)
         Text(
             text = description,
             style = MaterialTheme.typography.bodyMedium,
@@ -249,15 +437,25 @@ fun ProductWarrantyField(warrantyInformation: String, modifier: Modifier = Modif
 
 @Composable
 fun AddToCartButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Button(
-        onClick = onClick,
-        modifier = modifier
-    ) {
+    Button(onClick = onClick, modifier = modifier) {
         Text(text = "Ajouter au panier")
     }
 }
 
-// --- PREVIEWS (Aperçus) ---
+// ==========================================
+// --- PREVIEWS ---
+// ==========================================
+
+@Preview(showBackground = true)
+@Composable
+fun ProductHomeScreenPreview() {
+    ProductExplorerTheme {
+        ProductHomeScreen(
+            featuredProduct = sampleProduct(),
+            onFeaturedProductClick = {}
+        )
+    }
+}
 
 @Preview(showBackground = true)
 @Composable
@@ -265,17 +463,6 @@ fun ProductDetailScreenPreview() {
     ProductExplorerTheme {
         ProductDetailScreen(
             product = sampleProduct(),
-            onAddToCartClick = {}
-        )
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun ProductDetailScreenOutOfStockPreview() {
-    ProductExplorerTheme {
-        ProductDetailScreen(
-            product = sampleProductOutOfStock(),
             onAddToCartClick = {}
         )
     }
