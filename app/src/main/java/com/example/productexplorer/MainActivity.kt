@@ -31,6 +31,11 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
@@ -59,7 +64,6 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-// --- MODÈLE DE DONNÉES ET EXEMPLES (TP 4) ---
 data class ProductUi(
     val id: Int,
     val title: String,
@@ -106,7 +110,6 @@ fun sampleProductOutOfStock(): ProductUi {
     )
 }
 
-// --- DONNÉES LOCALES DU CATALOGUE (TP 6) ---
 fun sampleProducts(): List<ProductUi> {
     return listOf(
         sampleProduct(),
@@ -156,11 +159,6 @@ fun sampleCategories(): List<String> {
     return listOf("Smartphones", "Audio", "Wearables", "Maison")
 }
 
-// ==========================================
-// --- NOUVEAUX COMPOSABLES DU TP 5 (ACCUEIL) ---
-// ==========================================
-
-// 1. Écran d'accueil principal qui assemble les sections
 @Composable
 fun ProductHomeScreen(
     featuredProduct: ProductUi,
@@ -186,8 +184,6 @@ fun ProductHomeScreen(
         DailyOfferBox()
     }
 }
-
-// 2. En-tête de l'accueil
 @Composable
 fun HomeHeader(modifier: Modifier = Modifier) {
     Column(modifier = modifier) {
@@ -201,8 +197,6 @@ fun HomeHeader(modifier: Modifier = Modifier) {
         )
     }
 }
-
-// 3. Fausse barre de recherche visuelle
 @Composable
 fun SearchPreviewBar(modifier: Modifier = Modifier) {
     Surface(
@@ -217,8 +211,6 @@ fun SearchPreviewBar(modifier: Modifier = Modifier) {
         )
     }
 }
-
-// 4. Section du produit mis en avant
 @Composable
 fun FeaturedProductSection(
     product: ProductUi,
@@ -259,8 +251,6 @@ fun FeaturedProductSection(
         }
     }
 }
-
-// 5. Ligne d'informations rapides (Prix, Note, Stock) avec Row
 @Composable
 fun ProductQuickInfoRow(
     price: Double,
@@ -283,8 +273,6 @@ fun ProductQuickInfoRow(
         )
     }
 }
-
-// 6. Section des catégories
 @Composable
 fun CategoriesSection(modifier: Modifier = Modifier) {
     Column(modifier = modifier) {
@@ -330,8 +318,6 @@ fun CategoryChip(
         )
     }
 }
-
-// 7. Bloc Offre du jour avec un badge superposé grâce à Box
 @Composable
 fun DailyOfferBox(modifier: Modifier = Modifier) {
     Box(modifier = modifier) {
@@ -369,18 +355,46 @@ fun DailyOfferBox(modifier: Modifier = Modifier) {
     }
 }
 
-
-// ==========================================
-// --- COMPOSABLES DU TP 6 (CATALOGUE) ---
-// ==========================================
-
-// 1. Écran catalogue : titre, description, catégories puis liste des produits
 @Composable
 fun ProductCatalogScreen(
     products: List<ProductUi>,
     onProductClick: (ProductUi) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var searchQuery by rememberSaveable {
+        mutableStateOf("")
+    }
+
+    var showOnlyInStock by rememberSaveable {
+        mutableStateOf(false)
+    }
+
+    var favoriteProductIds by rememberSaveable {
+        mutableStateOf(listOf<Int>())
+    }
+
+    fun toggleFavorite(productId: Int) {
+        favoriteProductIds = if (favoriteProductIds.contains(productId)) {
+            favoriteProductIds - productId
+        } else {
+            favoriteProductIds + productId
+        }
+    }
+
+    val filteredProducts = remember(products, searchQuery, showOnlyInStock) {
+        products.filter { product ->
+            val matchesSearch =
+                product.title.contains(searchQuery, ignoreCase = true) ||
+                        product.brand.contains(searchQuery, ignoreCase = true) ||
+                        product.category.contains(searchQuery, ignoreCase = true)
+
+            val matchesStock =
+                !showOnlyInStock || product.stock > 0
+
+            matchesSearch && matchesStock
+        }
+    }
+
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
@@ -402,14 +416,51 @@ fun ProductCatalogScreen(
             )
         }
         item {
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { newValue ->
+                    searchQuery = newValue
+                },
+                label = {
+                    Text(text = "Rechercher un produit")
+                },
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+        item {
+            Button(
+                onClick = {
+                    showOnlyInStock = !showOnlyInStock
+                }
+            ) {
+                Text(
+                    text = if (showOnlyInStock) {
+                        "Afficher tous les produits"
+                    } else {
+                        "Afficher uniquement les produits en stock"
+                    }
+                )
+            }
+        }
+        item {
+            Text(
+                text = "${filteredProducts.size} produit(s) affiché(s)",
+                style = MaterialTheme.typography.bodyMedium
+            )
+        }
+        item {
             CategoryRow(categories = sampleCategories())
         }
         items(
-            items = products,
+            items = filteredProducts,
             key = { product -> product.id }
         ) { product ->
             ProductListItem(
                 product = product,
+                isFavorite = favoriteProductIds.contains(product.id),
+                onFavoriteClick = {
+                    toggleFavorite(product.id)
+                },
                 onClick = {
                     onProductClick(product)
                 }
@@ -418,10 +469,11 @@ fun ProductCatalogScreen(
     }
 }
 
-// 2. Carte réutilisable pour un produit de la liste
 @Composable
 fun ProductListItem(
     product: ProductUi,
+    isFavorite: Boolean,
+    onFavoriteClick: () -> Unit,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -455,6 +507,15 @@ fun ProductListItem(
                 color = MaterialTheme.colorScheme.primary
             )
             Spacer(modifier = Modifier.height(8.dp))
+            Button(onClick = onFavoriteClick) {
+                Text(
+                    text = if (isFavorite) {
+                        "Retirer des favoris"
+                    } else {
+                        "Ajouter aux favoris"
+                    }
+                )
+            }
             Button(onClick = onClick) {
                 Text(text = "Voir le produit")
             }
@@ -462,7 +523,6 @@ fun ProductListItem(
     }
 }
 
-// 3. Ligne horizontale de catégories
 @Composable
 fun CategoryRow(
     categories: List<String>,
@@ -477,11 +537,6 @@ fun CategoryRow(
         }
     }
 }
-
-
-// ==========================================
-// --- ANCIENS COMPOSABLES DU TP 4 (DETAIL) ---
-// ==========================================
 
 @Composable
 fun ProductDetailScreen(
@@ -614,10 +669,6 @@ fun AddToCartButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
         Text(text = "Ajouter au panier")
     }
 }
-
-// ==========================================
-// --- PREVIEWS ---
-// ==========================================
 
 @Preview(showBackground = true)
 @Composable
