@@ -50,9 +50,10 @@ class MainActivity : ComponentActivity() {
         setContent {
             ProductExplorerTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    // TP6 : On affiche maintenant le catalogue de produits
-                    ProductCatalogScreen(
+                    // TP9 : MainActivity fournit les données, le container gère l'état
+                    ProductCatalogContainer(
                         products = sampleProducts(),
+                        categories = sampleCategories(),
                         onProductClick = {
                             // Plus tard : ouvrir le détail du produit
                         },
@@ -64,6 +65,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+// --- MODÈLE DE DONNÉES ET EXEMPLES (TP 4) ---
 data class ProductUi(
     val id: Int,
     val title: String,
@@ -110,6 +112,7 @@ fun sampleProductOutOfStock(): ProductUi {
     )
 }
 
+// --- DONNÉES LOCALES DU CATALOGUE (TP 6) ---
 fun sampleProducts(): List<ProductUi> {
     return listOf(
         sampleProduct(),
@@ -159,6 +162,11 @@ fun sampleCategories(): List<String> {
     return listOf("Smartphones", "Audio", "Wearables", "Maison")
 }
 
+// ==========================================
+// --- NOUVEAUX COMPOSABLES DU TP 5 (ACCUEIL) ---
+// ==========================================
+
+// 1. Écran d'accueil principal qui assemble les sections
 @Composable
 fun ProductHomeScreen(
     featuredProduct: ProductUi,
@@ -184,6 +192,8 @@ fun ProductHomeScreen(
         DailyOfferBox()
     }
 }
+
+// 2. En-tête de l'accueil
 @Composable
 fun HomeHeader(modifier: Modifier = Modifier) {
     Column(modifier = modifier) {
@@ -197,6 +207,8 @@ fun HomeHeader(modifier: Modifier = Modifier) {
         )
     }
 }
+
+// 3. Fausse barre de recherche visuelle
 @Composable
 fun SearchPreviewBar(modifier: Modifier = Modifier) {
     Surface(
@@ -211,6 +223,8 @@ fun SearchPreviewBar(modifier: Modifier = Modifier) {
         )
     }
 }
+
+// 4. Section du produit mis en avant
 @Composable
 fun FeaturedProductSection(
     product: ProductUi,
@@ -251,6 +265,8 @@ fun FeaturedProductSection(
         }
     }
 }
+
+// 5. Ligne d'informations rapides (Prix, Note, Stock) avec Row
 @Composable
 fun ProductQuickInfoRow(
     price: Double,
@@ -273,6 +289,8 @@ fun ProductQuickInfoRow(
         )
     }
 }
+
+// 6. Section des catégories
 @Composable
 fun CategoriesSection(modifier: Modifier = Modifier) {
     Column(modifier = modifier) {
@@ -318,6 +336,8 @@ fun CategoryChip(
         )
     }
 }
+
+// 7. Bloc Offre du jour avec un badge superposé grâce à Box
 @Composable
 fun DailyOfferBox(modifier: Modifier = Modifier) {
     Box(modifier = modifier) {
@@ -355,12 +375,20 @@ fun DailyOfferBox(modifier: Modifier = Modifier) {
     }
 }
 
+
+// ==========================================
+// --- CATALOGUE : TP 6, interactif au TP 8, State Hoisting au TP 9 ---
+// ==========================================
+
+// 1. Composable STATEFUL : il possède l'état de l'écran catalogue (TP9)
 @Composable
-fun ProductCatalogScreen(
+fun ProductCatalogContainer(
     products: List<ProductUi>,
+    categories: List<String>,
     onProductClick: (ProductUi) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    // Étape 2 : les états sont remontés ici
     var searchQuery by rememberSaveable {
         mutableStateOf("")
     }
@@ -373,14 +401,7 @@ fun ProductCatalogScreen(
         mutableStateOf(listOf<Int>())
     }
 
-    fun toggleFavorite(productId: Int) {
-        favoriteProductIds = if (favoriteProductIds.contains(productId)) {
-            favoriteProductIds - productId
-        } else {
-            favoriteProductIds + productId
-        }
-    }
-
+    // Étape 3 : la liste filtrée est calculée là où se trouve l'état
     val filteredProducts = remember(products, searchQuery, showOnlyInStock) {
         products.filter { product ->
             val matchesSearch =
@@ -395,6 +416,50 @@ fun ProductCatalogScreen(
         }
     }
 
+    // Étape 4 : la fonction qui modifie les favoris reste près de leur état
+    fun toggleFavorite(productId: Int) {
+        favoriteProductIds = if (favoriteProductIds.contains(productId)) {
+            favoriteProductIds - productId
+        } else {
+            favoriteProductIds + productId
+        }
+    }
+
+    // Étape 6 : les données descendent, les événements remontent
+    ProductCatalogScreen(
+        products = filteredProducts,
+        categories = categories,
+        searchQuery = searchQuery,
+        onSearchQueryChange = { newValue ->
+            searchQuery = newValue
+        },
+        showOnlyInStock = showOnlyInStock,
+        onToggleStockFilter = {
+            showOnlyInStock = !showOnlyInStock
+        },
+        favoriteProductIds = favoriteProductIds,
+        onFavoriteClick = { productId ->
+            toggleFavorite(productId)
+        },
+        onProductClick = onProductClick,
+        modifier = modifier
+    )
+}
+
+// 2. Composable STATELESS : il affiche les valeurs reçues et signale les événements (TP9)
+@Composable
+fun ProductCatalogScreen(
+    products: List<ProductUi>,
+    categories: List<String>,
+    searchQuery: String,
+    onSearchQueryChange: (String) -> Unit,
+    showOnlyInStock: Boolean,
+    onToggleStockFilter: () -> Unit,
+    favoriteProductIds: List<Int>,
+    onFavoriteClick: (Int) -> Unit,
+    onProductClick: (ProductUi) -> Unit,
+    modifier: Modifier = Modifier
+) {
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
@@ -415,23 +480,21 @@ fun ProductCatalogScreen(
                 style = MaterialTheme.typography.bodyMedium
             )
         }
+        // Étape 7 : le champ affiche la valeur reçue et signale les changements
         item {
             OutlinedTextField(
                 value = searchQuery,
-                onValueChange = { newValue ->
-                    searchQuery = newValue
-                },
+                onValueChange = onSearchQueryChange,
                 label = {
                     Text(text = "Rechercher un produit")
                 },
                 modifier = Modifier.fillMaxWidth()
             )
         }
+        // Étape 8 : le bouton signale le clic au parent
         item {
             Button(
-                onClick = {
-                    showOnlyInStock = !showOnlyInStock
-                }
+                onClick = onToggleStockFilter
             ) {
                 Text(
                     text = if (showOnlyInStock) {
@@ -442,24 +505,27 @@ fun ProductCatalogScreen(
                 )
             }
         }
+        // Étape 9 : products est déjà filtrée
         item {
             Text(
-                text = "${filteredProducts.size} produit(s) affiché(s)",
+                text = "${products.size} produit(s) affiché(s)",
                 style = MaterialTheme.typography.bodyMedium
             )
         }
+        // Étape 10 : catégories reçues en paramètre
         item {
-            CategoryRow(categories = sampleCategories())
+            CategoryRow(categories = categories)
         }
+        // Étape 11 : chaque carte reçoit son état favori et signale le clic
         items(
-            items = filteredProducts,
+            items = products,
             key = { product -> product.id }
         ) { product ->
             ProductListItem(
                 product = product,
                 isFavorite = favoriteProductIds.contains(product.id),
                 onFavoriteClick = {
-                    toggleFavorite(product.id)
+                    onFavoriteClick(product.id)
                 },
                 onClick = {
                     onProductClick(product)
@@ -469,6 +535,7 @@ fun ProductCatalogScreen(
     }
 }
 
+// 3. Carte réutilisable (stateless) pour un produit de la liste
 @Composable
 fun ProductListItem(
     product: ProductUi,
@@ -507,6 +574,7 @@ fun ProductListItem(
                 color = MaterialTheme.colorScheme.primary
             )
             Spacer(modifier = Modifier.height(8.dp))
+            // La carte affiche l'état reçu et déclenche l'action reçue
             Button(onClick = onFavoriteClick) {
                 Text(
                     text = if (isFavorite) {
@@ -523,6 +591,7 @@ fun ProductListItem(
     }
 }
 
+// 4. Ligne horizontale de catégories
 @Composable
 fun CategoryRow(
     categories: List<String>,
@@ -537,6 +606,11 @@ fun CategoryRow(
         }
     }
 }
+
+
+// ==========================================
+// --- ANCIENS COMPOSABLES DU TP 4 (DETAIL) ---
+// ==========================================
 
 @Composable
 fun ProductDetailScreen(
@@ -670,6 +744,10 @@ fun AddToCartButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
     }
 }
 
+// ==========================================
+// --- PREVIEWS ---
+// ==========================================
+
 @Preview(showBackground = true)
 @Composable
 fun ProductHomeScreenPreview() {
@@ -691,12 +769,16 @@ fun ProductDetailScreenPreview() {
         )
     }
 }
-@Preview(showBackground = true)
+@Preview(
+    showBackground = true,
+    name = "Catalogue - Light Theme"
+)
 @Composable
-fun ProductCatalogScreenPreview() {
-    ProductExplorerTheme {
-        ProductCatalogScreen(
+fun ProductCatalogContainerLightPreview() {
+    ProductExplorerTheme(darkTheme = false) {
+        ProductCatalogContainer(
             products = sampleProducts(),
+            categories = sampleCategories(),
             onProductClick = {}
         )
     }
@@ -707,24 +789,29 @@ fun ProductCatalogScreenPreview() {
     name = "Catalogue - Dark Theme"
 )
 @Composable
-fun ProductCatalogScreenDarkPreview() {
+fun ProductCatalogContainerDarkPreview() {
     ProductExplorerTheme(darkTheme = true) {
-        ProductCatalogScreen(
+        ProductCatalogContainer(
             products = sampleProducts(),
+            categories = sampleCategories(),
             onProductClick = {}
         )
     }
 }
 
-@Preview(
-    showBackground = true,
-    name = "Catalogue - Light Theme"
-)
+@Preview(showBackground = true, name = "Catalogue - Stateless")
 @Composable
-fun ProductCatalogScreenLightPreview() {
-    ProductExplorerTheme(darkTheme = false) {
+fun ProductCatalogScreenStatelessPreview() {
+    ProductExplorerTheme {
         ProductCatalogScreen(
             products = sampleProducts(),
+            categories = sampleCategories(),
+            searchQuery = "",
+            onSearchQueryChange = {},
+            showOnlyInStock = false,
+            onToggleStockFilter = {},
+            favoriteProductIds = listOf(1),
+            onFavoriteClick = {},
             onProductClick = {}
         )
     }
