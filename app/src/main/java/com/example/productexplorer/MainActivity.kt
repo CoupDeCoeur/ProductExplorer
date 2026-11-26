@@ -31,9 +31,8 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
@@ -41,6 +40,10 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import com.example.productexplorer.ui.theme.ProductExplorerTheme
 
 class MainActivity : ComponentActivity() {
@@ -52,6 +55,7 @@ class MainActivity : ComponentActivity() {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
                     ProductCatalogContainer(
                         onProductClick = {
+                            // Plus tard : ouvrir le détail du produit
                         },
                         modifier = Modifier.padding(innerPadding)
                     )
@@ -61,6 +65,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+// --- MODÈLE DE DONNÉES ET EXEMPLES (TP 4) ---
 data class ProductUi(
     val id: Int,
     val title: String,
@@ -107,6 +112,7 @@ fun sampleProductOutOfStock(): ProductUi {
     )
 }
 
+// --- DONNÉES LOCALES DU CATALOGUE (TP 6) ---
 fun sampleProducts(): List<ProductUi> {
     return listOf(
         sampleProduct(),
@@ -156,51 +162,87 @@ fun sampleCategories(): List<String> {
     return listOf("Smartphones", "Audio", "Wearables", "Maison")
 }
 
+data class ProductCatalogUiState(
+    val products: List<ProductUi> = emptyList(),
+    val categories: List<String> = emptyList(),
+    val searchQuery: String = "",
+    val showOnlyInStock: Boolean = false,
+    val favoriteProductIds: List<Int> = emptyList()
+)
+
 class ProductCatalogViewModel : ViewModel() {
 
     private val allProducts: List<ProductUi> = sampleProducts()
+    private val allCategories: List<String> = sampleCategories()
 
-    val categories: List<String> = sampleCategories()
+    private val _uiState = MutableStateFlow(
+        ProductCatalogUiState(
+            products = allProducts,
+            categories = allCategories
+        )
+    )
 
-    var searchQuery by mutableStateOf("")
-        private set
+    val uiState: StateFlow<ProductCatalogUiState> = _uiState.asStateFlow()
 
-    var showOnlyInStock by mutableStateOf(false)
-        private set
-
-    var favoriteProductIds by mutableStateOf(listOf<Int>())
-        private set
-
-    val filteredProducts: List<ProductUi>
-        get() = allProducts.filter { product ->
+    private fun filterProducts(searchQuery: String, showOnlyInStock: Boolean): List<ProductUi> {
+        return allProducts.filter { product ->
             val matchesSearch =
                 product.title.contains(searchQuery, ignoreCase = true) ||
                         product.brand.contains(searchQuery, ignoreCase = true) ||
                         product.category.contains(searchQuery, ignoreCase = true)
-
             val matchesStock =
                 !showOnlyInStock || product.stock > 0
-
             matchesSearch && matchesStock
         }
+    }
 
     fun onSearchQueryChange(newValue: String) {
-        searchQuery = newValue
+        _uiState.update { currentState ->
+            currentState.copy(
+                searchQuery = newValue,
+                products = filterProducts(
+                    searchQuery = newValue,
+                    showOnlyInStock = currentState.showOnlyInStock
+                )
+            )
+        }
     }
 
     fun onToggleStockFilter() {
-        showOnlyInStock = !showOnlyInStock
+        _uiState.update { currentState ->
+            val newShowOnlyInStock = !currentState.showOnlyInStock
+
+            currentState.copy(
+                showOnlyInStock = newShowOnlyInStock,
+                products = filterProducts(
+                    searchQuery = currentState.searchQuery,
+                    showOnlyInStock = newShowOnlyInStock
+                )
+            )
+        }
     }
 
     fun onFavoriteClick(productId: Int) {
-        favoriteProductIds = if (favoriteProductIds.contains(productId)) {
-            favoriteProductIds - productId
-        } else {
-            favoriteProductIds + productId
+        _uiState.update { currentState ->
+            val newFavoriteIds =
+                if (currentState.favoriteProductIds.contains(productId)) {
+                    currentState.favoriteProductIds - productId
+                } else {
+                    currentState.favoriteProductIds + productId
+                }
+
+            currentState.copy(
+                favoriteProductIds = newFavoriteIds
+            )
         }
     }
 }
 
+// ==========================================
+// --- NOUVEAUX COMPOSABLES DU TP 5 (ACCUEIL) ---
+// ==========================================
+
+// 1. Écran d'accueil principal qui assemble les sections
 @Composable
 fun ProductHomeScreen(
     featuredProduct: ProductUi,
@@ -227,6 +269,7 @@ fun ProductHomeScreen(
     }
 }
 
+// 2. En-tête de l'accueil
 @Composable
 fun HomeHeader(modifier: Modifier = Modifier) {
     Column(modifier = modifier) {
@@ -241,6 +284,7 @@ fun HomeHeader(modifier: Modifier = Modifier) {
     }
 }
 
+// 3. Fausse barre de recherche visuelle
 @Composable
 fun SearchPreviewBar(modifier: Modifier = Modifier) {
     Surface(
@@ -256,6 +300,7 @@ fun SearchPreviewBar(modifier: Modifier = Modifier) {
     }
 }
 
+// 4. Section du produit mis en avant
 @Composable
 fun FeaturedProductSection(
     product: ProductUi,
@@ -297,6 +342,7 @@ fun FeaturedProductSection(
     }
 }
 
+// 5. Ligne d'informations rapides (Prix, Note, Stock) avec Row
 @Composable
 fun ProductQuickInfoRow(
     price: Double,
@@ -320,6 +366,7 @@ fun ProductQuickInfoRow(
     }
 }
 
+// 6. Section des catégories
 @Composable
 fun CategoriesSection(modifier: Modifier = Modifier) {
     Column(modifier = modifier) {
@@ -366,6 +413,7 @@ fun CategoryChip(
     }
 }
 
+// 7. Bloc Offre du jour avec un badge superposé grâce à Box
 @Composable
 fun DailyOfferBox(modifier: Modifier = Modifier) {
     Box(modifier = modifier) {
@@ -403,20 +451,27 @@ fun DailyOfferBox(modifier: Modifier = Modifier) {
     }
 }
 
+
+// ==========================================
+// --- COMPOSABLES DU TP 6 (CATALOGUE) ---
+// ==========================================
+
 @Composable
 fun ProductCatalogContainer(
     onProductClick: (ProductUi) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: ProductCatalogViewModel = viewModel()
 ) {
+    val uiState by viewModel.uiState.collectAsState()
+
     ProductCatalogScreen(
-        products = viewModel.filteredProducts,
-        categories = viewModel.categories,
-        searchQuery = viewModel.searchQuery,
+        products = uiState.products,
+        categories = uiState.categories,
+        searchQuery = uiState.searchQuery,
         onSearchQueryChange = viewModel::onSearchQueryChange,
-        showOnlyInStock = viewModel.showOnlyInStock,
+        showOnlyInStock = uiState.showOnlyInStock,
         onToggleStockFilter = viewModel::onToggleStockFilter,
-        favoriteProductIds = viewModel.favoriteProductIds,
+        favoriteProductIds = uiState.favoriteProductIds,
         onFavoriteClick = viewModel::onFavoriteClick,
         onProductClick = onProductClick,
         modifier = modifier
@@ -440,8 +495,8 @@ fun ProductCatalogScreen(
         modifier = modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        contentPadding = PaddingValues(16.dp), // Marge intérieure autour du contenu de la liste
+        verticalArrangement = Arrangement.spacedBy(16.dp) // Espace vertical entre les éléments
     ) {
         item {
             Text(
@@ -575,6 +630,11 @@ fun CategoryRow(
     }
 }
 
+
+// ==========================================
+// --- ANCIENS COMPOSABLES DU TP 4 (DETAIL) ---
+// ==========================================
+
 @Composable
 fun ProductDetailScreen(
     product: ProductUi,
@@ -707,6 +767,9 @@ fun AddToCartButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
     }
 }
 
+// ==========================================
+// --- PREVIEWS ---
+// ==========================================
 
 @Preview(showBackground = true)
 @Composable
